@@ -3589,7 +3589,7 @@ function handleCrearMeta(event) {
 
     showLoader(true, "Creando meta de recolección...");
 
-    = {
+    const record = {
         ID_Meta: "META-" + new Date().getTime(),
         Nombre_Meta: nombre,
         Monto_Objetivo_COP: montoObj,

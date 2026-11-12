@@ -6617,15 +6617,15 @@ function handleSaveUserSubmit(event) {
         if (document.body.contains(script)) document.body.removeChild(script);
 
         // --- VALIDACIÓN FLEXIBLE ---
-        // Aceptamos que el backend devuelva { success: true } o { ok: true }
-      if (res && (res.success === true || res.ok === true)) {
-    fetchUsersList();
-    document.getElementById("formUsuarioAdmin").reset();
-    alert("Usuario guardado exitosamente en Google Sheets.");
-} else {
-    const errorMsg = res ? (res.error || res.message || "Error desconocido en el backend") : "Error de respuesta del servidor";
-    alert("❌ Error al guardar:\n\n" + errorMsg);
-}
+        if (res && (res.success === true || res.ok === true)) {
+            fetchUsersList();
+            document.getElementById("formUsuarioAdmin").reset();
+            alert("✅ Usuario guardado exitosamente en Google Sheets.");
+        } else {
+            const errorMsg = res ? (res.error || res.message || "Error desconocido en el backend") : "Error de respuesta del servidor";
+            alert("❌ Error al guardar:\n\n" + errorMsg);
+            console.error("Respuesta del backend:", res);
+        }
     };
 
     script.src = MI_GAS_URL + '?' + params.toString();
@@ -6633,7 +6633,7 @@ function handleSaveUserSubmit(event) {
         showLoader(false);
         delete window[callbackName];
         if (document.body.contains(script)) document.body.removeChild(script);
-        alert("Error de conexión al intentar guardar el usuario. Revisa tu conexión a internet.");
+        alert("❌ Error de conexión al intentar guardar el usuario.");
     };
     document.body.appendChild(script);
 }

@@ -1,6 +1,6 @@
 var MI_GAS_URL = "https://script.google.com/macros/s/AKfycbyR7gCwNBQaxBqoNv8asCuH_dff2LGj0qjkpMQ9fQcsJ_Y7naGQLcxMDNnqZGpta-Ff/exec";
 // --- INDEXEDDB & OFFLINE PWA MANAGER ---
-        const DB_NAME = 'FincaSaucesOfflineDB';
+        const DB_NAME = 'fincalosaucesOffline_STAGING';
         const DB_VERSION = 1;
         const STORE_NAME = 'pending_records';
 

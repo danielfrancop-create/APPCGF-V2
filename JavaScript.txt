@@ -6120,13 +6120,13 @@ function setupLightboxInteractions() {
         }
     });
 }
-
 // ==========================================
-// SISTEMA DE USUARIOS Y PERMISOS (JSONP)
+// SISTEMA DE USUARIOS Y PERMISOS
 // ==========================================
 let currentUserRole = "admin"; 
 let currentUserPermissions = {};
 let currentUserEmail = "";
+let usuariosListCache = [];
 
 function jsonpRequestUsuarios(action, argsArray = []) {
     return new Promise((resolve, reject) => {
@@ -6168,7 +6168,6 @@ function jsonpRequestUsuarios(action, argsArray = []) {
 async function inicializarSesion() {
     let email = localStorage.getItem('finca_user_email') || ""; 
     
-    // Si no hay email guardado, pedimos uno
     if (!email) {
         email = prompt("Por favor, ingresa tu correo autorizado para acceder:");
         if (email) localStorage.setItem('finca_user_email', email);
@@ -6176,18 +6175,17 @@ async function inicializarSesion() {
 
     if (!email) {
         console.warn("No se proporcionó correo. Modo Legacy activado.");
-        currentUserRole = "admin"; // Fallback para desarrollo
+        currentUserRole = "admin"; 
         return;
     }
 
     currentUserEmail = email;
 
     try {
-        // Adaptado al doGet que espera un array de argumentos 'args'
         const res = await jsonpRequestUsuarios('getCurrentUserRole', [email]);
 
         if (!res || res.ok === false || res.legacy) {
-            console.warn('Modo Legacy activado (no se encontró hoja de usuarios o hubo error):', res);
+            console.warn('Modo Legacy activado:', res);
             currentUserRole = "admin";
             return;
         }
@@ -6197,41 +6195,33 @@ async function inicializarSesion() {
                 <div style="display:flex; flex-direction:column; justify-content:center; align-items:center; height:100vh; font-family:sans-serif; text-align:center; background:#f8fafc;">
                     <h1 style="color:#e11d48; font-size:24px;">Acceso Denegado</h1>
                     <p style="color:#64748b; margin-top:10px;">El correo <b>${email}</b> no está registrado o está inactivo.</p>
-                    <p style="color:#64748b; margin-top:5px; font-size:12px;">Contacta al administrador de la finca.</p>
                 </div>`;
             return;
         }
 
-        // Usuario autorizado
         currentUserRole = res.rol ? res.rol.toLowerCase() : "view";
         currentUserPermissions = res.permisos || {};
         
         console.log("✅ Sesión iniciada:", res.nombre, "| Rol:", currentUserRole);
-
-        // Aplicar permisos modulares
         aplicarPermisosUI(currentUserRole, currentUserPermissions);
 
     } catch (e) {
-        console.warn('Error de red al verificar usuario → entrando en modo legacy', e);
-        currentUserRole = "admin"; // Fallback si falla la red
+        console.warn('Error de red al verificar usuario → modo legacy', e);
+        currentUserRole = "admin"; 
     }
 }
 
 function aplicarPermisosUI(rol, permisos) {
-    // Si es admin, no ocultar nada
     if (rol === 'admin') {
         restoreAdminPermissions();
         return;
     }
-
-    // Si es de solo lectura, bloquear formularios
     if (rol === 'view' || rol === 'lectura') {
         applyViewOnlyPermissions();
     }
 
-    // Ocultar módulos específicos según los checkboxes de la hoja
     const isPermitted = (val) => {
-        if (val === undefined || val === null || val === "") return true; // Por defecto permitir si no está configurado
+        if (val === undefined || val === null || val === "") return true;
         const s = String(val).trim().toLowerCase();
         return s === "sí" || s === "si" || s === "true" || s === "1" || s === "activo";
     };
@@ -6243,144 +6233,193 @@ function aplicarPermisosUI(rol, permisos) {
     const modMapaLotes = isPermitted(permisos.Modulo_MapaLotes || permisos.Modulo_Lotes);
     const modCajaGeneral = isPermitted(permisos.Modulo_CajaGeneral);
 
-    // Seleccionar los botones de navegación por ID o Data-attribute
-    const dashBtns = document.querySelectorAll("#navBtn_dashboard, #mobileNavBtn_dashboard, [data-module='Modulo_Dashboard']");
-    dashBtns.forEach(b => b.style.display = modDashboard ? "" : "none");
-
-    const posBtns = document.querySelectorAll("#toggleViewBtn, #mobileToggleViewBtn, [data-module='Modulo_POS']");
-    posBtns.forEach(b => b.style.display = modPOS ? "" : "none");
-
-    const erBtns = document.querySelectorAll("#estadoResultadosBtn, #mobileEstadoResultadosBtn, [data-module='Modulo_EstadoResultados']");
-    erBtns.forEach(b => b.style.display = modEstadoResultados ? "" : "none");
-
-    const obBtns = document.querySelectorAll("#obligacionesBtn, #mobileObligacionesBtn, [data-module='Modulo_Obligaciones']");
-    obBtns.forEach(b => b.style.display = modObligaciones ? "" : "none");
-
-    const mapBtns = document.querySelectorAll("#mapaLotesBtn, #mobileMapaLotesBtn, [data-module='Modulo_MapaLotes']");
-    mapBtns.forEach(b => b.style.display = modMapaLotes ? "" : "none");
-
-    const cajaBtns = document.querySelectorAll("#cajaGeneralBtn, #mobileCajaGeneralBtn, [data-module='Modulo_CajaGeneral']");
-    cajaBtns.forEach(b => b.style.display = modCajaGeneral ? "" : "none");
+    document.querySelectorAll("#navBtn_dashboard, #mobileNavBtn_dashboard, [data-module='Modulo_Dashboard']").forEach(b => b.style.display = modDashboard ? "" : "none");
+    document.querySelectorAll("#toggleViewBtn, #mobileToggleViewBtn, [data-module='Modulo_POS']").forEach(b => b.style.display = modPOS ? "" : "none");
+    document.querySelectorAll("#estadoResultadosBtn, #mobileEstadoResultadosBtn, [data-module='Modulo_EstadoResultados']").forEach(b => b.style.display = modEstadoResultados ? "" : "none");
+    document.querySelectorAll("#obligacionesBtn, #mobileObligacionesBtn, [data-module='Modulo_Obligaciones']").forEach(b => b.style.display = modObligaciones ? "" : "none");
+    document.querySelectorAll("#mapaLotesBtn, #mobileMapaLotesBtn, [data-module='Modulo_MapaLotes']").forEach(b => b.style.display = modMapaLotes ? "" : "none");
+    document.querySelectorAll("#cajaGeneralBtn, #mobileCajaGeneralBtn, [data-module='Modulo_CajaGeneral']").forEach(b => b.style.display = modCajaGeneral ? "" : "none");
 }
 
 function restoreAdminPermissions() {
-    // Mostrar todos los botones
     const buttonsToShow = document.querySelectorAll(
         "#toggleViewBtn, #mobileToggleViewBtn, #obligacionesBtn, #mobileObligacionesBtn, #cajaGeneralBtn, #mobileCajaGeneralBtn, #gestionUsuariosBtn, #mobileUsuariosBtn, #mobileSyncBtn, button[onclick*='openDeleteModal'], button[onclick*='eliminarFotoGallery'], button[onclick*='openPhotoUploadModal'], button[onclick*='marcarComoPagado'], button[onclick*='startLoteCycle'], button[onclick*='endLoteCycle']"
     );
     buttonsToShow.forEach(btn => {
-        if (btn) {
-            btn.style.display = "";
-            btn.classList.remove("hidden");
-        }
+        if (btn) { btn.style.display = ""; btn.classList.remove("hidden"); }
     });
 
-    // Habilitar todos los formularios
-    const forms = document.querySelectorAll("form");
-    forms.forEach(form => {
-        const elements = form.querySelectorAll("input, select, textarea, button[type='submit']");
-        elements.forEach(el => {
-            if (el.tagName === "BUTTON") {
-                el.disabled = false;
-                el.classList.remove("opacity-50", "cursor-not-allowed");
-            } else if (el.tagName === "INPUT" || el.tagName === "TEXTAREA") {
-                el.readOnly = false;
-                el.disabled = false;
-            } else if (el.tagName === "SELECT") {
-                el.disabled = false;
-            }
+    document.querySelectorAll("form").forEach(form => {
+        form.querySelectorAll("input, select, textarea, button[type='submit']").forEach(el => {
+            if (el.tagName === "BUTTON") { el.disabled = false; el.classList.remove("opacity-50", "cursor-not-allowed"); } 
+            else if (el.tagName === "INPUT" || el.tagName === "TEXTAREA") { el.readOnly = false; el.disabled = false; } 
+            else if (el.tagName === "SELECT") { el.disabled = false; }
         });
     });
 }
 
 function applyViewOnlyPermissions() {
-    // Ocultar botones de acción
     const buttonsToHide = document.querySelectorAll(
         "#toggleViewBtn, #mobileToggleViewBtn, #obligacionesBtn, #mobileObligacionesBtn, #cajaGeneralBtn, #mobileCajaGeneralBtn, #gestionUsuariosBtn, #mobileUsuariosBtn, #mobileSyncBtn, button[onclick*='openDeleteModal'], button[onclick*='eliminarFotoGallery'], button[onclick*='openPhotoUploadModal'], button[onclick*='marcarComoPagado'], button[onclick*='startLoteCycle'], button[onclick*='endLoteCycle']"
     );
-    buttonsToHide.forEach(btn => {
-        btn.style.display = "none";
-    });
+    buttonsToHide.forEach(btn => btn.style.display = "none");
 
-    // Deshabilitar formularios
-    const dataForms = document.querySelectorAll("#posForm, #obligacionesForm, #gastoPersonalForm, #securityChangeForm, #clearDataForm, #formUsuarioAdmin, #photoUploadForm");
-    dataForms.forEach(form => {
-        const elements = form.querySelectorAll("input, select, textarea, button[type='submit']");
-        elements.forEach(el => {
-            if (el.tagName === "BUTTON") {
-                el.disabled = true;
-                el.classList.add("opacity-50", "cursor-not-allowed");
-            } else if (el.tagName === "INPUT" || el.tagName === "TEXTAREA") {
-                el.readOnly = true;
-                el.disabled = true;
-            } else if (el.tagName === "SELECT") {
-                el.disabled = true;
-            }
+    document.querySelectorAll("#posForm, #obligacionesForm, #gastoPersonalForm, #securityChangeForm, #clearDataForm, #formUsuarioAdmin, #photoUploadForm").forEach(form => {
+        form.querySelectorAll("input, select, textarea, button[type='submit']").forEach(el => {
+            if (el.tagName === "BUTTON") { el.disabled = true; el.classList.add("opacity-50", "cursor-not-allowed"); } 
+            else if (el.tagName === "INPUT" || el.tagName === "TEXTAREA") { el.readOnly = true; el.disabled = true; } 
+            else if (el.tagName === "SELECT") { el.disabled = true; }
         });
     });
 }
 
+// --- GESTIÓN DE USUARIOS ---
+function openUsersModal() {
+    if (currentUserRole !== "admin") { alert("Acceso denegado."); return; }
+    const modal = document.getElementById("modalGestionUsuarios");
+    if (!modal) return;
+    fetchUsersList();
+    modal.classList.remove("hidden");
+}
+
+function closeUsersModal() {
+    const modal = document.getElementById("modalGestionUsuarios");
+    if (modal) modal.classList.add("hidden");
+    const form = document.getElementById("formUsuarioAdmin");
+    if (form) form.reset();
+}
+
+function fetchUsersList() {
+    if (typeof google === 'undefined' || !google.script || !google.script.run) {
+        usuariosListCache = [{ ID: "USR-001", Email: "danielfrancop@gmail.com", Nombre: "danielfrancop", Rol: "admin", Estado: "ACTIVO" }];
+        renderUsersTable();
+        return;
+    }
+    showLoader(true, "Cargando usuarios...");
+    jsonpRequestUsuarios('obtenerListaUsuarios', [currentUserEmail]).then(res => {
+        showLoader(false);
+        if (res && res.success) {
+            usuariosListCache = (res.data || []).map(u => ({
+                ID: u.id || u.ID || '-', Email: u.email || u.Email || u.Correo_Electronico || '-',
+                Nombre: u.nombre || u.Nombre || '-', Rol: String(u.rol || u.Rol || 'view').toLowerCase(),
+                Estado: String(u.estado || u.Estado || 'ACTIVO').toUpperCase()
+            }));
+            renderUsersTable();
+        } else {
+            alert(res ? (res.error || "Error al obtener usuarios") : "Error de respuesta");
+        }
+    }).catch(err => { showLoader(false); alert("Error de red: " + err.message); });
+}
+
+function renderUsersTable() {
+    const tbody = document.getElementById("usuariosTableBody");
+    if (!tbody) return;
+    tbody.innerHTML = "";
+
+    if (usuariosListCache.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="6" class="px-4 py-4 text-center text-xs text-slate-400 italic">No hay usuarios registrados.</td></tr>`;
+        return;
+    }
+
+    usuariosListCache.forEach(u => {
+        const userId = u.ID || '-', userEmail = u.Email || '-', userNombre = u.Nombre || '-';
+        const userRol = String(u.Rol || 'view').toLowerCase(), userEstado = String(u.Estado || 'ACTIVO').toUpperCase();
+        const isVer = userRol === "view", isActivo = userEstado === "ACTIVO";
+
+        const badgeRol = isVer ? `<span class="px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase bg-sky-100 text-sky-800 border border-sky-200">Ver Solo (view)</span>` : `<span class="px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase bg-emerald-100 text-emerald-800 border border-emerald-200">Administrador (admin)</span>`;
+        const badgeEstado = isActivo ? `<span class="px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase bg-emerald-100 text-emerald-800 border border-emerald-200">ACTIVO</span>` : `<span class="px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase bg-rose-100 text-rose-800 border border-rose-200">INACTIVO</span>`;
+
+        const tr = document.createElement("tr");
+        tr.className = "hover:bg-slate-50 dark:hover:bg-slate-800 transition duration-150";
+        tr.innerHTML = `
+            <td class="px-4 py-2.5 text-left font-mono font-bold text-slate-500">${userId}</td>
+            <td class="px-4 py-2.5 text-left font-semibold text-slate-900 dark:text-white">${userEmail}</td>
+            <td class="px-4 py-2.5 text-left text-slate-600 dark:text-slate-300">${userNombre}</td>
+            <td class="px-4 py-2.5 text-center">${badgeRol}</td>
+            <td class="px-4 py-2.5 text-center">${badgeEstado}</td>
+            <td class="px-4 py-2.5 text-center flex justify-center items-center gap-1.5">
+                <button type="button" onclick="editUserFill('${userEmail.replace(/'/g, "\\'")}', '${userNombre.replace(/'/g, "\\'")}', '${userRol}')" class="px-2 py-1 rounded-lg bg-slate-100 text-slate-700 hover:bg-slate-200 font-bold text-[10px] transition cursor-pointer">✏️ Editar</button>
+                <button type="button" onclick="toggleUserStatus('${userEmail.replace(/'/g, "\\'")}', '${userNombre.replace(/'/g, "\\'")}', '${userRol}', '${userEstado}')" class="px-2 py-1 rounded-lg ${isActivo ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800'} font-bold text-[10px] transition cursor-pointer">${isActivo ? '🚫 Desactivar' : '✅ Activar'}</button>
+                <button type="button" onclick="deleteUser('${userEmail.replace(/'/g, "\\'")}')" class="px-2 py-1 rounded-lg bg-rose-50 text-rose-600 hover:bg-rose-100 font-bold text-[10px] transition cursor-pointer">🗑️</button>
+            </td>`;
+        tbody.appendChild(tr);
+    });
+}
+
+function editUserFill(email, nombre, rol) {
+    document.getElementById("userFormEmail").value = email || "";
+    document.getElementById("userFormNombre").value = nombre || "";
+    document.getElementById("userFormRol").value = rol || "view";
+}
+
+function handleSaveUserSubmit(event) {
+    event.preventDefault();
+    const email = document.getElementById("userFormEmail").value.trim().toLowerCase();
+    const nombre = document.getElementById("userFormNombre").value.trim();
+    const rol = document.getElementById("userFormRol").value;
+
+    if (!email) { alert("Ingresa un correo válido."); return; }
+
+    const existingUser = usuariosListCache.find(u => (u.Email || "").toLowerCase() === email);
+    const record = {
+        ID: existingUser ? existingUser.ID : "", Email: email, Nombre: nombre || email.split('@')[0], Rol: rol, Estado: "ACTIVO",
+        Correo_Electronico: email, Modulo_Dashboard: "Sí", Modulo_POS: "Sí", Modulo_EstadoResultados: "Sí", Modulo_Obligaciones: "Sí", Modulo_MapaLotes: "Sí", Modulo_CajaGeneral: "Sí"
+    };
+
+    showLoader(true, "Guardando...");
+    jsonpRequestUsuarios('guardarUsuario', [record, currentUserEmail]).then(res => {
+        showLoader(false);
+        if (res && (res.success === true || res.ok === true)) {
+            fetchUsersList();
+            document.getElementById("formUsuarioAdmin").reset();
+            alert("✅ Usuario guardado exitosamente.");
+        } else {
+            alert("❌ Error: " + (res ? (res.error || res.message) : "Sin respuesta"));
+        }
+    }).catch(err => { showLoader(false); alert("Error de red: " + err.message); });
+}
+
+function toggleUserStatus(email, nombre, rol, estadoActual) {
+    const nuevoEstado = (estadoActual === "ACTIVO") ? "INACTIVO" : "ACTIVO";
+    if (!confirm(`¿Cambiar estado de ${email} a ${nuevoEstado}?`)) return;
+    const user = usuariosListCache.find(u => (u.Email || "").toLowerCase() === email.toLowerCase());
+    if (!user) return;
+    
+    const record = Object.assign({}, user, { Estado: nuevoEstado });
+    showLoader(true, "Actualizando...");
+    jsonpRequestUsuarios('guardarUsuario', [record, currentUserEmail]).then(res => {
+        showLoader(false);
+        if (res && (res.success === true || res.ok === true)) fetchUsersList();
+        else alert("❌ Error: " + (res ? res.error : "Sin respuesta"));
+    });
+}
+
+function deleteUser(email) {
+    if (!confirm(`¿Eliminar al usuario ${email}?`)) return;
+    const user = usuariosListCache.find(u => (u.Email || "").toLowerCase() === email.toLowerCase());
+    if (!user) return;
+
+    showLoader(true, "Eliminando...");
+    jsonpRequestUsuarios('eliminarUsuario', [user.ID, currentUserEmail]).then(res => {
+        showLoader(false);
+        if (res && (res.success === true || res.ok === true)) fetchUsersList();
+        else alert("❌ Error: " + (res ? res.error : "Sin respuesta"));
+    });
+}
+
+// Inicialización
 function initApp() {
-    // 1. Iniciar el nuevo sistema de usuarios (asíncrono)
     inicializarSesion().then(() => {
-        // 2. Cuando termine de verificar, carga el dashboard
         populateLoteDropdowns();
         fetchData();
         setupLightboxInteractions();
         updatePendingSyncBadge();
+        if (currentUserRole !== 'admin') applyViewOnlyPermissions();
     });
 }
 
-function enviarDatosGoogleSheets(tipo, record) {
-    if (tipo === 'guardarFotoLote' || tipo === 'fotosLotes') {
-        const url = MI_GAS_URL + '?action=guardarFotoLote&args=' + encodeURIComponent(JSON.stringify([record]));
-        const iframe = document.createElement('iframe');
-        iframe.style.display = 'none';
-        iframe.name = 'iframe_foto_' + Date.now();
-        document.body.appendChild(iframe);
-
-        const form = document.createElement('form');
-        form.method = 'POST';
-        form.action = url;
-        form.target = iframe.name;
-        form.style.display = 'none';
-        
-        document.body.appendChild(form);
-        form.submit();
-        
-        setTimeout(() => {
-            document.body.removeChild(form);
-            document.body.removeChild(iframe);
-        }, 2000);
-
-        alert("¡Fotografía enviada! Se está procesando en Google Drive...");
-    } else {
-        const callbackName = 'jsonpCallback_' + Math.round(100000 * Math.random());
-        window[callbackName] = function(response) {
-            if (response && response.success) {
-                console.log(`Registro ${tipo} guardado exitosamente.`);
-            } else {
-                console.error(`Error al guardar ${tipo}: ` + (response ? response.error : "Desconocido"));
-            }
-            if (document.body.contains(script)) document.body.removeChild(script);
-            delete window[callbackName];
-        };
-
-        const script = document.createElement('script');
-        script.src = MI_GAS_URL + '?action=' + tipo + '&callback=' + callbackName + '&args=' + encodeURIComponent(JSON.stringify([record]));
-        
-        script.onerror = function() {
-            console.error("Error de conexión al intentar guardar.");
-            if (document.body.contains(script)) document.body.removeChild(script);
-            delete window[callbackName];
-        };
-
-        document.body.appendChild(script);
-    }
-}
-
-// Inicialización automática al cargar la página
 document.addEventListener("DOMContentLoaded", initApp);
+
 // ==========================================
 // INTERFAZ DE GESTIÓN DE USUARIOS (SOLO ADMIN)
 // ==========================================

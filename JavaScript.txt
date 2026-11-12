@@ -6433,24 +6433,14 @@ function fetchUsersList() {
         delete window[callbackName];
         if (document.body.contains(script)) document.body.removeChild(script);
 
+        // --- AQUÍ AGREGAMOS LA ALERTA PARA VER QUÉ DEVUELVE EL BACKEND ---
+        alert("Respuesta del Backend:\n" + JSON.stringify(res, null, 2));
+        
         if (res && res.ok) {
-            // Mapear las propiedades del backend a lo que espera la tabla
-            usuariosListCache = (res.usuarios || []).map(u => ({
-                ID: u.ID,
-                Email: u.Email || u.Correo_Electronico,
-                Nombre: u.Nombre,
-                Rol: String(u.Rol || 'view').toLowerCase(),
-                Estado: String(u.Estado || 'ACTIVO').toUpperCase(),
-                Modulo_Dashboard: u.Modulo_Dashboard,
-                Modulo_POS: u.Modulo_POS,
-                Modulo_EstadoResultados: u.Modulo_EstadoResultados,
-                Modulo_Obligaciones: u.Modulo_Obligaciones,
-                Modulo_MapaLotes: u.Modulo_MapaLotes,
-                Modulo_CajaGeneral: u.Modulo_CajaGeneral
-            }));
-            renderUsersTable();
+            fetchUsersList();
+            document.getElementById("formUsuarioAdmin").reset();
         } else {
-            alert(res ? (res.error || "Error al obtener usuarios") : "Error de respuesta del servidor");
+            alert(res ? (res.error || "Error al guardar") : "Error de respuesta del servidor");
         }
     };
 

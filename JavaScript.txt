@@ -6618,16 +6618,14 @@ function handleSaveUserSubmit(event) {
 
         // --- VALIDACIÓN FLEXIBLE ---
         // Aceptamos que el backend devuelva { success: true } o { ok: true }
-        if (res && (res.success === true || res.ok === true)) {
-            fetchUsersList();
-            document.getElementById("formUsuarioAdmin").reset();
-            alert("Usuario guardado exitosamente en Google Sheets.");
-        } else {
-            // Mostrar error detallado si falla
-            const errorMsg = res ? (res.error || res.message || "Error desconocido en el backend") : "Error de respuesta del servidor";
-            alert("❌ Error al guardar:\n\n" + errorMsg);
-            console.error("Respuesta del backend:", res);
-        }
+      if (res && (res.success === true || res.ok === true)) {
+    fetchUsersList();
+    document.getElementById("formUsuarioAdmin").reset();
+    alert("Usuario guardado exitosamente en Google Sheets.");
+} else {
+    const errorMsg = res ? (res.error || res.message || "Error desconocido en el backend") : "Error de respuesta del servidor";
+    alert("❌ Error al guardar:\n\n" + errorMsg);
+}
     };
 
     script.src = MI_GAS_URL + '?' + params.toString();

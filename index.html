@@ -43,7 +43,6 @@
             </div>
         </div>
     </div>
-
     <script>
       async function loadPartials() {
         const files = [
@@ -56,28 +55,29 @@
           { id: 'map-container', file: 'ViewMap.txt' },
           { id: 'modals-container', file: 'Modals.txt' }
         ];
-        for (const { id, file } of files) {
+        
+        for (const item of files) {
           try {
-            const res = await fetch(file);
+            // Agregamos versión para evitar caché
+            const res = await fetch(item.file + '?v=' + new Date().getTime());
             const html = await res.text();
-            document.getElementById(id).innerHTML = html;
+            document.getElementById(item.id).innerHTML = html;
           } catch (e) {
-            console.warn('No se pudo cargar:', file, e);
+            console.warn('No se pudo cargar:', item.file, e);
           }
         }
         
-        // Una vez cargados los HTML, cargamos el JavaScript principal
+        // Cargar el JavaScript principal
         const script = document.createElement('script');
-        script.src = 'JavaScript.txt?v=' + new Date().getTime();
+        script.src = 'JavaScript.txt?v=' + new Date().getTime(); // Forzar recarga
         script.onload = () => {
-            // Iniciar la app solo después de que el JS y el HTML estén listos
             if (typeof initApp === 'function') initApp();
         };
         document.body.appendChild(script);
       }
       
-      // Iniciar la carga
-      loadPartials();
+      // Iniciar la carga al terminar de leer el HTML
+      document.addEventListener('DOMContentLoaded', loadPartials);
     </script>
 
     <script>
@@ -91,3 +91,4 @@
     </script>
 </body>
 </html>
+    

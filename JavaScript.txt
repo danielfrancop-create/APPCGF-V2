@@ -6572,7 +6572,7 @@ function handleSaveUserSubmit(event) {
     const existingUser = usuariosListCache.find(u => (u.Email || "").toLowerCase() === email);
     const id = existingUser ? existingUser.ID : "";
 
-    // IMPORTANTE: Usar los nombres exactos de las columnas de tu hoja
+    // IMPORTANTE: Nombres exactos según las columnas de la hoja
     const record = {
         ID: id,
         Email: email,
@@ -6616,13 +6616,17 @@ function handleSaveUserSubmit(event) {
         delete window[callbackName];
         if (document.body.contains(script)) document.body.removeChild(script);
 
-        // AQUÍ ESTÁ EL CAMBIO: Tu backend devuelve success
-        if (res && res.success) {
+        // --- VALIDACIÓN FLEXIBLE ---
+        // Aceptamos que el backend devuelva { success: true } o { ok: true }
+        if (res && (res.success === true || res.ok === true)) {
             fetchUsersList();
             document.getElementById("formUsuarioAdmin").reset();
             alert("Usuario guardado exitosamente en Google Sheets.");
         } else {
-            alert(res ? (res.error || "Error al guardar") : "Error de respuesta del servidor");
+            // Mostrar error detallado si falla
+            const errorMsg = res ? (res.error || res.message || "Error desconocido en el backend") : "Error de respuesta del servidor";
+            alert("❌ Error al guardar:\n\n" + errorMsg);
+            console.error("Respuesta del backend:", res);
         }
     };
 
@@ -6631,7 +6635,7 @@ function handleSaveUserSubmit(event) {
         showLoader(false);
         delete window[callbackName];
         if (document.body.contains(script)) document.body.removeChild(script);
-        alert("Error de conexión al guardar usuario.");
+        alert("Error de conexión al intentar guardar el usuario. Revisa tu conexión a internet.");
     };
     document.body.appendChild(script);
 }

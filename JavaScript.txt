@@ -6321,18 +6321,13 @@ function applyViewOnlyPermissions() {
 }
 
 function initApp() {
-    // 1. Iniciar chequeo de usuarios (asíncrono)
+    // 1. Iniciar el nuevo sistema de usuarios (asíncrono)
     inicializarSesion().then(() => {
-        // 2. Cargar datos del dashboard
+        // 2. Cuando termine de verificar, carga el dashboard
         populateLoteDropdowns();
         fetchData();
         setupLightboxInteractions();
         updatePendingSyncBadge();
-        
-        // 3. Aplicar reglas visuales base
-        if (currentUserRole !== 'admin') {
-            applyViewOnlyPermissions();
-        }
     });
 }
 

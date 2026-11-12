@@ -3589,7 +3589,7 @@ function handleCrearMeta(event) {
 
     showLoader(true, "Creando meta de recolección...");
 
-    const record = {
+    = {
         ID_Meta: "META-" + new Date().getTime(),
         Nombre_Meta: nombre,
         Monto_Objetivo_COP: montoObj,
@@ -6381,3 +6381,339 @@ function enviarDatosGoogleSheets(tipo, record) {
 
 // Inicialización automática al cargar la página
 document.addEventListener("DOMContentLoaded", initApp);
+// ==========================================
+// INTERFAZ DE GESTIÓN DE USUARIOS (SOLO ADMIN)
+// ==========================================
+let usuariosListCache = [];
+
+function openUsersModal() {
+    if (currentUserRole !== "admin") {
+        alert("Acceso denegado. Solo los administradores pueden gestionar usuarios.");
+        return;
+    }
+    const modal = document.getElementById("modalGestionUsuarios");
+    if (!modal) return;
+
+    fetchUsersList();
+    modal.classList.remove("hidden");
+}
+
+function closeUsersModal() {
+    const modal = document.getElementById("modalGestionUsuarios");
+    if (modal) modal.classList.add("hidden");
+    const form = document.getElementById("formUsuarioAdmin");
+    if (form) form.reset();
+}
+
+function fetchUsersList() {
+    if (typeof google === 'undefined' || !google.script || !google.script.run) {
+        // Mock local users para pruebas sin Google
+        usuariosListCache = [
+            { ID: "1", Email: "danielfrancop@gmail.com", Nombre: "danielfrancop", Rol: "admin", Estado: "ACTIVO", Correo_Electronico: "danielfrancop@gmail.com" },
+            { ID: "2", Email: "santiagofrancop1959@gmail.com", Nombre: "Santi", Rol: "view", Estado: "ACTIVO", Correo_Electronico: "santiagofrancop1959@gmail.com" }
+        ];
+        renderUsersTable();
+        return;
+    }
+
+    showLoader(true, "Cargando usuarios...");
+    
+    // Adaptado a tu doGet que espera un array de argumentos 'args'
+    const callbackName = 'jsonp_cb_users_' + Date.now() + '_' + Math.floor(Math.random() * 1e6);
+    const script = document.createElement('script');
+    
+    const params = new URLSearchParams({
+        action: 'obtenerListaUsuarios',
+        args: JSON.stringify([currentUserEmail]),
+        callback: callbackName
+    });
+
+    window[callbackName] = function(res) {
+        showLoader(false);
+        delete window[callbackName];
+        if (document.body.contains(script)) document.body.removeChild(script);
+
+        if (res && res.ok) {
+            // Mapear las propiedades del backend a lo que espera la tabla
+            usuariosListCache = (res.usuarios || []).map(u => ({
+                ID: u.ID,
+                Email: u.Email || u.Correo_Electronico,
+                Nombre: u.Nombre,
+                Rol: String(u.Rol || 'view').toLowerCase(),
+                Estado: String(u.Estado || 'ACTIVO').toUpperCase(),
+                Modulo_Dashboard: u.Modulo_Dashboard,
+                Modulo_POS: u.Modulo_POS,
+                Modulo_EstadoResultados: u.Modulo_EstadoResultados,
+                Modulo_Obligaciones: u.Modulo_Obligaciones,
+                Modulo_MapaLotes: u.Modulo_MapaLotes,
+                Modulo_CajaGeneral: u.Modulo_CajaGeneral
+            }));
+            renderUsersTable();
+        } else {
+            alert(res ? (res.error || "Error al obtener usuarios") : "Error de respuesta del servidor");
+        }
+    };
+
+    script.src = MI_GAS_URL + '?' + params.toString();
+    script.onerror = () => {
+        showLoader(false);
+        delete window[callbackName];
+        if (document.body.contains(script)) document.body.removeChild(script);
+        alert("Error de conexión al cargar usuarios.");
+    };
+    document.body.appendChild(script);
+}
+
+function renderUsersTable() {
+    const tbody = document.getElementById("usuariosTableBody");
+    if (!tbody) return;
+    tbody.innerHTML = "";
+
+    if (usuariosListCache.length === 0) {
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="6" class="px-4 py-4 text-center text-xs text-slate-400 italic">
+                    No hay usuarios registrados en la hoja Usuarios.
+                </td>
+            </tr>
+        `;
+        return;
+    }
+
+    usuariosListCache.forEach(u => {
+        const tr = document.createElement("tr");
+        tr.className = "hover:bg-slate-50 dark:hover:bg-slate-800 transition duration-150";
+
+        const isVer = u.Rol === "view" || u.Rol === "lectura";
+        const isActivo = u.Estado === "ACTIVO";
+
+        const badgeRol = isVer ?
+            `<span class="px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase bg-sky-100 text-sky-800 dark:bg-sky-950 dark:text-sky-300 border border-sky-200">Ver Solo (view)</span>` :
+            `<span class="px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 border border-emerald-200">Administrador (admin)</span>`;
+
+        const badgeEstado = isActivo ?
+            `<span class="px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase bg-emerald-100 text-emerald-800 border border-emerald-200">ACTIVO</span>` :
+            `<span class="px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase bg-rose-100 text-rose-800 border border-rose-200">INACTIVO</span>`;
+
+        // Formatear los datos para pasarlos de forma segura al onclick
+        const safeEmail = (u.Email || "").replace(/'/g, "\\'");
+        const safeNombre = (u.Nombre || "").replace(/'/g, "\\'");
+        const safeRol = (u.Rol || "view").replace(/'/g, "\\'");
+        const safeEstado = (u.Estado || "ACTIVO").replace(/'/g, "\\'");
+
+        tr.innerHTML = `
+            <td class="px-4 py-2.5 text-left font-mono font-bold text-slate-500">${u.ID || '-'}</td>
+            <td class="px-4 py-2.5 text-left font-semibold text-slate-900 dark:text-white">${u.Email}</td>
+            <td class="px-4 py-2.5 text-left text-slate-600 dark:text-slate-300">${u.Nombre || '-'}</td>
+            <td class="px-4 py-2.5 text-center">${badgeRol}</td>
+            <td class="px-4 py-2.5 text-center">${badgeEstado}</td>
+            <td class="px-4 py-2.5 text-center flex justify-center items-center gap-1.5">
+                <button type="button" onclick="editUserFill('${safeEmail}', '${safeNombre}', '${safeRol}')" class="px-2 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-200 font-bold text-[10px] transition cursor-pointer" title="Editar este usuario">
+                    ✏️ Editar
+                </button>
+                <button type="button" onclick="toggleUserStatus('${safeEmail}', '${safeNombre}', '${safeRol}', '${safeEstado}')" class="px-2 py-1 rounded-lg ${isActivo ? 'bg-amber-100 text-amber-800 hover:bg-amber-200' : 'bg-emerald-100 text-emerald-800 hover:bg-emerald-200'} font-bold text-[10px] transition cursor-pointer">
+                    ${isActivo ? '🚫 Desactivar' : '✅ Activar'}
+                </button>
+                <button type="button" onclick="deleteUser('${safeEmail}')" class="px-2 py-1 rounded-lg bg-rose-50 text-rose-600 hover:bg-rose-100 font-bold text-[10px] transition cursor-pointer" title="Eliminar usuario">
+                    🗑️
+                </button>
+            </td>
+        `;
+        tbody.appendChild(tr);
+    });
+}
+
+function editUserFill(email, nombre, rol) {
+    document.getElementById("userFormEmail").value = email || "";
+    document.getElementById("userFormNombre").value = nombre || "";
+    document.getElementById("userFormRol").value = rol || "view";
+
+    const user = usuariosListCache.find(u => (u.Email || "").toLowerCase() === (email || "").toLowerCase());
+    if (user) {
+        const isPermitted = (val) => {
+            if (val === undefined || val === null || val === "") return true;
+            const s = String(val).trim().toLowerCase();
+            return s === "sí" || s === "si" || s === "true" || s === "1" || s === "activo";
+        };
+
+        if (document.getElementById("userFormModDashboard")) document.getElementById("userFormModDashboard").checked = isPermitted(user.Modulo_Dashboard);
+        if (document.getElementById("userFormModPOS")) document.getElementById("userFormModPOS").checked = isPermitted(user.Modulo_POS);
+        if (document.getElementById("userFormModEstadoResultados")) document.getElementById("userFormModEstadoResultados").checked = isPermitted(user.Modulo_EstadoResultados);
+        if (document.getElementById("userFormModObligaciones")) document.getElementById("userFormModObligaciones").checked = isPermitted(user.Modulo_Obligaciones);
+        if (document.getElementById("userFormModMapaLotes")) document.getElementById("userFormModMapaLotes").checked = isPermitted(user.Modulo_MapaLotes);
+        if (document.getElementById("userFormModCajaGeneral")) document.getElementById("userFormModCajaGeneral").checked = isPermitted(user.Modulo_CajaGeneral);
+    }
+}
+
+function handleSaveUserSubmit(event) {
+    event.preventDefault();
+
+    const email = (document.getElementById("userFormEmail").value || "").trim().toLowerCase();
+    const nombre = (document.getElementById("userFormNombre").value || "").trim();
+    const rol = document.getElementById("userFormRol").value || "view";
+
+    const modDashboard = document.getElementById("userFormModDashboard") ? (document.getElementById("userFormModDashboard").checked ? "Sí" : "No") : "Sí";
+    const modPOS = document.getElementById("userFormModPOS") ? (document.getElementById("userFormModPOS").checked ? "Sí" : "No") : "Sí";
+    const modEstadoResultados = document.getElementById("userFormModEstadoResultados") ? (document.getElementById("userFormModEstadoResultados").checked ? "Sí" : "No") : "Sí";
+    const modObligaciones = document.getElementById("userFormModObligaciones") ? (document.getElementById("userFormModObligaciones").checked ? "Sí" : "No") : "Sí";
+    const modMapaLotes = document.getElementById("userFormModMapaLotes") ? (document.getElementById("userFormModMapaLotes").checked ? "Sí" : "No") : "Sí";
+    const modCajaGeneral = document.getElementById("userFormModCajaGeneral") ? (document.getElementById("userFormModCajaGeneral").checked ? "Sí" : "No") : "Sí";
+
+    if (!email) {
+        alert("Ingresa un correo electrónico válido.");
+        return;
+    }
+
+    // Verificar si el usuario ya existe para obtener su ID y actualizarlo en lugar de crear uno nuevo
+    const existingUser = usuariosListCache.find(u => (u.Email || "").toLowerCase() === email);
+    const id = existingUser ? existingUser.ID : "";
+
+    // IMPORTANTE: Usar los nombres exactos de las columnas de tu hoja
+    const record = {
+        ID: id,
+        Email: email,
+        Nombre: nombre || email.split('@')[0],
+        Rol: rol,
+        Estado: "ACTIVO",
+        Correo_Electronico: email,
+        Modulo_Dashboard: modDashboard,
+        Modulo_POS: modPOS,
+        Modulo_EstadoResultados: modEstadoResultados,
+        Modulo_Obligaciones: modObligaciones,
+        Modulo_MapaLotes: modMapaLotes,
+        Modulo_CajaGeneral: modCajaGeneral
+    };
+
+    showLoader(true, "Guardando usuario...");
+
+    if (typeof google === 'undefined' || !google.script || !google.script.run) {
+        // Simulación local
+        setTimeout(() => {
+            if (existingUser) {
+                Object.assign(existingUser, record);
+            } else {
+                record.ID = String(usuariosListCache.length + 1);
+                usuariosListCache.push(record);
+            }
+            renderUsersTable();
+            showLoader(false);
+            document.getElementById("formUsuarioAdmin").reset();
+            alert(`¡Usuario ${email} guardado con éxito (Simulado)!`);
+        }, 600);
+        return;
+    }
+
+    // JSONP Request
+    const callbackName = 'jsonp_cb_save_' + Date.now() + '_' + Math.floor(Math.random() * 1e6);
+    const script = document.createElement('script');
+    
+    const params = new URLSearchParams({
+        action: 'guardarUsuario',
+        args: JSON.stringify([record, currentUserEmail]),
+        callback: callbackName
+    });
+
+    window[callbackName] = function(res) {
+        showLoader(false);
+        delete window[callbackName];
+        if (document.body.contains(script)) document.body.removeChild(script);
+
+        if (res && res.ok) {
+            fetchUsersList();
+            document.getElementById("formUsuarioAdmin").reset();
+            alert("Usuario guardado exitosamente en Google Sheets.");
+        } else {
+            alert(res ? (res.error || "Error al guardar") : "Error de respuesta del servidor");
+        }
+    };
+
+    script.src = MI_GAS_URL + '?' + params.toString();
+    script.onerror = () => {
+        showLoader(false);
+        delete window[callbackName];
+        if (document.body.contains(script)) document.body.removeChild(script);
+        alert("Error de conexión al guardar usuario.");
+    };
+    document.body.appendChild(script);
+}
+
+function toggleUserStatus(email, nombre, rol, estadoActual) {
+    const nuevoEstado = (estadoActual === "ACTIVO") ? "INACTIVO" : "ACTIVO";
+    if (!confirm(`¿Deseas cambiar el estado de ${email} a ${nuevoEstado}?`)) return;
+
+    const user = usuariosListCache.find(u => (u.Email || "").toLowerCase() === email.toLowerCase());
+    if (!user) return;
+
+    const record = Object.assign({}, user, { Estado: nuevoEstado });
+
+    showLoader(true, "Actualizando estado...");
+
+    const callbackName = 'jsonp_cb_status_' + Date.now() + '_' + Math.floor(Math.random() * 1e6);
+    const script = document.createElement('script');
+    
+    const params = new URLSearchParams({
+        action: 'guardarUsuario',
+        args: JSON.stringify([record, currentUserEmail]),
+        callback: callbackName
+    });
+
+    window[callbackName] = function(res) {
+        showLoader(false);
+        delete window[callbackName];
+        if (document.body.contains(script)) document.body.removeChild(script);
+
+        if (res && res.ok) {
+            fetchUsersList();
+        } else {
+            alert(res ? (res.error || "Error al cambiar estado") : "Error de respuesta");
+        }
+    };
+
+    script.src = MI_GAS_URL + '?' + params.toString();
+    script.onerror = () => {
+        showLoader(false);
+        delete window[callbackName];
+        if (document.body.contains(script)) document.body.removeChild(script);
+        alert("Error de conexión.");
+    };
+    document.body.appendChild(script);
+}
+
+function deleteUser(email) {
+    if (!confirm(`¿Estás seguro de eliminar al usuario ${email}? No podrá volver a ingresar.`)) return;
+
+    const user = usuariosListCache.find(u => (u.Email || "").toLowerCase() === email.toLowerCase());
+    if (!user) return;
+
+    showLoader(true, "Eliminando usuario...");
+
+    const callbackName = 'jsonp_cb_del_' + Date.now() + '_' + Math.floor(Math.random() * 1e6);
+    const script = document.createElement('script');
+    
+    const params = new URLSearchParams({
+        action: 'eliminarUsuario',
+        args: JSON.stringify([user.ID, currentUserEmail]),
+        callback: callbackName
+    });
+
+    window[callbackName] = function(res) {
+        showLoader(false);
+        delete window[callbackName];
+        if (document.body.contains(script)) document.body.removeChild(script);
+
+        if (res && res.ok) {
+            fetchUsersList();
+        } else {
+            alert(res ? (res.error || "Error al eliminar") : "Error de respuesta");
+        }
+    };
+
+    script.src = MI_GAS_URL + '?' + params.toString();
+    script.onerror = () => {
+        showLoader(false);
+        delete window[callbackName];
+        if (document.body.contains(script)) document.body.removeChild(script);
+        alert("Error de conexión.");
+    };
+    document.body.appendChild(script);
+}

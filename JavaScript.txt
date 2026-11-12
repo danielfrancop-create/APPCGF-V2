@@ -6407,10 +6407,10 @@ function closeUsersModal() {
 
 function fetchUsersList() {
     if (typeof google === 'undefined' || !google.script || !google.script.run) {
-        // Mock local users para pruebas sin Google
+        // Mock local users para pruebas
         usuariosListCache = [
-            { ID: "1", Email: "danielfrancop@gmail.com", Nombre: "danielfrancop", Rol: "admin", Estado: "ACTIVO", Correo_Electronico: "danielfrancop@gmail.com" },
-            { ID: "2", Email: "santiagofrancop1959@gmail.com", Nombre: "Santi", Rol: "view", Estado: "ACTIVO", Correo_Electronico: "santiagofrancop1959@gmail.com" }
+            { ID: "USR-001", Email: "danielfrancop@gmail.com", Nombre: "danielfrancop", Rol: "admin", Estado: "ACTIVO" },
+            { ID: "USR-002", Email: "santiagofrancop1959@gmail.com", Nombre: "Santi", Rol: "view", Estado: "ACTIVO" }
         ];
         renderUsersTable();
         return;
@@ -6418,7 +6418,6 @@ function fetchUsersList() {
 
     showLoader(true, "Cargando usuarios...");
     
-    // Adaptado a tu doGet que espera un array de argumentos 'args'
     const callbackName = 'jsonp_cb_users_' + Date.now() + '_' + Math.floor(Math.random() * 1e6);
     const script = document.createElement('script');
     
@@ -6433,14 +6432,25 @@ function fetchUsersList() {
         delete window[callbackName];
         if (document.body.contains(script)) document.body.removeChild(script);
 
-        // --- AQUÍ AGREGAMOS LA ALERTA PARA VER QUÉ DEVUELVE EL BACKEND ---
-        alert("Respuesta del Backend:\n" + JSON.stringify(res, null, 2));
-        
-        if (res && res.ok) {
-            fetchUsersList();
-            document.getElementById("formUsuarioAdmin").reset();
+        // AQUÍ ESTÁ EL CAMBIO: Tu backend devuelve success y data
+        if (res && res.success) {
+            // Mapeamos los datos del backend a lo que espera la tabla
+            usuariosListCache = (res.data || []).map(u => ({
+                ID: u.id || u.ID || '-',
+                Email: u.email || u.Email || u.Correo_Electronico || '-',
+                Nombre: u.nombre || u.Nombre || '-',
+                Rol: String(u.rol || u.Rol || 'view').toLowerCase(),
+                Estado: String(u.estado || u.Estado || 'ACTIVO').toUpperCase(),
+                Modulo_Dashboard: u.moduloDashboard || u.Modulo_Dashboard,
+                Modulo_POS: u.moduloPOS || u.Modulo_POS,
+                Modulo_EstadoResultados: u.moduloEstadoResultados || u.Modulo_EstadoResultados,
+                Modulo_Obligaciones: u.moduloObligaciones || u.Modulo_Obligaciones,
+                Modulo_MapaLotes: u.moduloMapaLotes || u.Modulo_MapaLotes,
+                Modulo_CajaGeneral: u.moduloCajaGeneral || u.Modulo_CajaGeneral
+            }));
+            renderUsersTable();
         } else {
-            alert(res ? (res.error || "Error al guardar") : "Error de respuesta del servidor");
+            alert(res ? (res.error || "Error al obtener usuarios") : "Error de respuesta del servidor");
         }
     };
 
@@ -6534,7 +6544,6 @@ function editUserFill(email, nombre, rol) {
         if (document.getElementById("userFormModCajaGeneral")) document.getElementById("userFormModCajaGeneral").checked = isPermitted(user.Modulo_CajaGeneral);
     }
 }
-
 function handleSaveUserSubmit(event) {
     event.preventDefault();
 
@@ -6554,7 +6563,6 @@ function handleSaveUserSubmit(event) {
         return;
     }
 
-    // Verificar si el usuario ya existe para obtener su ID y actualizarlo en lugar de crear uno nuevo
     const existingUser = usuariosListCache.find(u => (u.Email || "").toLowerCase() === email);
     const id = existingUser ? existingUser.ID : "";
 
@@ -6577,14 +6585,9 @@ function handleSaveUserSubmit(event) {
     showLoader(true, "Guardando usuario...");
 
     if (typeof google === 'undefined' || !google.script || !google.script.run) {
-        // Simulación local
         setTimeout(() => {
-            if (existingUser) {
-                Object.assign(existingUser, record);
-            } else {
-                record.ID = String(usuariosListCache.length + 1);
-                usuariosListCache.push(record);
-            }
+            if (existingUser) Object.assign(existingUser, record);
+            else { record.ID = String(usuariosListCache.length + 1); usuariosListCache.push(record); }
             renderUsersTable();
             showLoader(false);
             document.getElementById("formUsuarioAdmin").reset();
@@ -6593,7 +6596,6 @@ function handleSaveUserSubmit(event) {
         return;
     }
 
-    // JSONP Request
     const callbackName = 'jsonp_cb_save_' + Date.now() + '_' + Math.floor(Math.random() * 1e6);
     const script = document.createElement('script');
     
@@ -6608,7 +6610,8 @@ function handleSaveUserSubmit(event) {
         delete window[callbackName];
         if (document.body.contains(script)) document.body.removeChild(script);
 
-        if (res && res.ok) {
+        // AQUÍ ESTÁ EL CAMBIO: Tu backend devuelve success
+        if (res && res.success) {
             fetchUsersList();
             document.getElementById("formUsuarioAdmin").reset();
             alert("Usuario guardado exitosamente en Google Sheets.");
@@ -6626,7 +6629,6 @@ function handleSaveUserSubmit(event) {
     };
     document.body.appendChild(script);
 }
-
 function toggleUserStatus(email, nombre, rol, estadoActual) {
     const nuevoEstado = (estadoActual === "ACTIVO") ? "INACTIVO" : "ACTIVO";
     if (!confirm(`¿Deseas cambiar el estado de ${email} a ${nuevoEstado}?`)) return;

@@ -68,7 +68,7 @@
         
         // Una vez cargados los HTML, cargamos el JavaScript principal
         const script = document.createElement('script');
-        script.src = 'JavaScript.txt'; // <-- Quitamos el ?v=10050
+        script.src = 'JavaScript.txt?v=' + new Date().getTime();
         script.onload = () => {
             // Iniciar la app solo después de que el JS y el HTML estén listos
             if (typeof initApp === 'function') initApp();

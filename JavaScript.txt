@@ -490,9 +490,18 @@ function updateConfigHeader() {
         actualizacion = `${year}-${month}-${day} ${hours}:${minutes}`;
     }
 
-    document.getElementById("headerTitle").textContent = nombreFinca;
-    let subtitleText = `Ubicación: ${ubicacion} | Última Sincronización: ${actualizacion}`;
-    document.getElementById("headerSubtitle").textContent = subtitleText;
+    // --- VALIDACIÓN PARA EVITAR EL ERROR DE NULL ---
+    const titleEl = document.getElementById("headerTitle");
+    if (titleEl) {
+        titleEl.textContent = nombreFinca;
+    }
+    
+    const subtitleEl = document.getElementById("headerSubtitle");
+    if (subtitleEl) {
+        let subtitleText = `Ubicación: ${ubicacion} | Última Sincronización: ${actualizacion}`;
+        subtitleEl.textContent = subtitleText;
+    }
+    
     populateDropdowns();
 }
 

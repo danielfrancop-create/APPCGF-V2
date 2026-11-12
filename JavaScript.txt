@@ -6463,7 +6463,6 @@ function fetchUsersList() {
     };
     document.body.appendChild(script);
 }
-
 function renderUsersTable() {
     const tbody = document.getElementById("usuariosTableBody");
     if (!tbody) return;
@@ -6481,11 +6480,18 @@ function renderUsersTable() {
     }
 
     usuariosListCache.forEach(u => {
+        // Normalizar las propiedades para que funcionen tanto si vienen en mayúscula como en minúscula
+        const userId = u.ID || u.id || '-';
+        const userEmail = u.Email || u.email || u.Correo_Electronico || '-';
+        const userNombre = u.Nombre || u.nombre || '-';
+        const userRol = String(u.Rol || u.rol || 'view').toLowerCase();
+        const userEstado = String(u.Estado || u.estado || 'ACTIVO').toUpperCase();
+
         const tr = document.createElement("tr");
         tr.className = "hover:bg-slate-50 dark:hover:bg-slate-800 transition duration-150";
 
-        const isVer = u.Rol === "view" || u.Rol === "lectura";
-        const isActivo = u.Estado === "ACTIVO";
+        const isVer = userRol === "view" || userRol === "lectura";
+        const isActivo = userEstado === "ACTIVO";
 
         const badgeRol = isVer ?
             `<span class="px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase bg-sky-100 text-sky-800 dark:bg-sky-950 dark:text-sky-300 border border-sky-200">Ver Solo (view)</span>` :
@@ -6496,15 +6502,15 @@ function renderUsersTable() {
             `<span class="px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase bg-rose-100 text-rose-800 border border-rose-200">INACTIVO</span>`;
 
         // Formatear los datos para pasarlos de forma segura al onclick
-        const safeEmail = (u.Email || "").replace(/'/g, "\\'");
-        const safeNombre = (u.Nombre || "").replace(/'/g, "\\'");
-        const safeRol = (u.Rol || "view").replace(/'/g, "\\'");
-        const safeEstado = (u.Estado || "ACTIVO").replace(/'/g, "\\'");
+        const safeEmail = (userEmail || "").replace(/'/g, "\\'");
+        const safeNombre = (userNombre || "").replace(/'/g, "\\'");
+        const safeRol = (userRol || "view").replace(/'/g, "\\'");
+        const safeEstado = (userEstado || "ACTIVO").replace(/'/g, "\\'");
 
         tr.innerHTML = `
-            <td class="px-4 py-2.5 text-left font-mono font-bold text-slate-500">${u.ID || '-'}</td>
-            <td class="px-4 py-2.5 text-left font-semibold text-slate-900 dark:text-white">${u.Email}</td>
-            <td class="px-4 py-2.5 text-left text-slate-600 dark:text-slate-300">${u.Nombre || '-'}</td>
+            <td class="px-4 py-2.5 text-left font-mono font-bold text-slate-500">${userId}</td>
+            <td class="px-4 py-2.5 text-left font-semibold text-slate-900 dark:text-white">${userEmail}</td>
+            <td class="px-4 py-2.5 text-left text-slate-600 dark:text-slate-300">${userNombre}</td>
             <td class="px-4 py-2.5 text-center">${badgeRol}</td>
             <td class="px-4 py-2.5 text-center">${badgeEstado}</td>
             <td class="px-4 py-2.5 text-center flex justify-center items-center gap-1.5">

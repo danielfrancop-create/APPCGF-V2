@@ -928,6 +928,15 @@ function changeDoughnutType(type) {
 }
 
 function renderCharts(selectedLote) {
+    const ctxBar = document.getElementById('barChart');
+    const ctxDona = document.getElementById('doughnutChart');
+
+    // Si los canvas no existen todavía, salimos de la función para evitar el error
+    if (!ctxBar || !ctxDona) {
+        console.warn("Los canvas de gráficos no están listos aún.");
+        return;
+    }
+
     if (barChartInstance) barChartInstance.destroy();
     if (doughnutChartInstance) doughnutChartInstance.destroy();
 
@@ -989,67 +998,174 @@ function renderCharts(selectedLote) {
         datasetVentas.push(v);
     });
 
-    const ctxBar = document.getElementById('barChart').getContext('2d');
-    barChartInstance = new Chart(ctxBar, {
-        type: 'bar',
-        data: {
-            labels: activeLotes,
-            datasets: [
-                {
-                    label: 'Costo Total Acumulado',
-                    data: datasetCostos,
-                    backgroundColor: 'rgba(239, 68, 68, 0.85)',
-                    borderColor: 'rgb(239, 68, 68)',
-                    borderWidth: 1.5,
-                    borderRadius: 6
-                },
-                {
-                    label: 'Ingreso Ventas',
-                    data: datasetVentas,
-                    backgroundColor: 'rgba(16, 185, 129, 0.85)',
-                    borderColor: 'rgb(16, 185, 129)',
-                    borderWidth: 1.5,
-                    borderRadius: 6
-                }
-            ]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                legend: {
-                    position: 'top',
-                    labels: {
-                        font: { family: 'Plus Jakarta Sans', size: 11, weight: '600' },
-                        boxWidth: 12
+    // Obtener contexto de forma segura
+    const barContext = ctxBar.getContext('2d');
+    if (barContext) {
+        barChartInstance = new Chart(barContext, {
+            type: 'bar',
+            data: {
+                labels: activeLotes,
+                datasets: [
+                    {
+                        label: 'Costo Total Acumulado',
+                        data: datasetCostos,
+                        backgroundColor: 'rgba(239, 68, 68, 0.85)',
+                        borderColor: 'rgb(239, 68, 68)',
+                        borderWidth: 1.5,
+                        borderRadius: 6
+                    },
+                    {
+                        label: 'Ingreso Ventas',
+                        data: datasetVentas,
+                        backgroundColor: 'rgba(16, 185, 129, 0.85)',
+                        borderColor: 'rgb(16, 185, 129)',
+                        borderWidth: 1.5,
+                        borderRadius: 6
                     }
-                },
-                tooltip: {
-                    callbacks: {
-                        label: function(context) {
-                            return context.dataset.label + ': ' + formatCOP(context.raw);
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'top',
+                        labels: {
+                            font: { family: 'Plus Jakarta Sans', size: 11, weight: '600' },
+                            boxWidth: 12
+                        }
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                return context.dataset.label + ': ' + formatCOP(context.raw);
+                            }
                         }
                     }
-                }
-            },
-            scales: {
-                x: {
-                    grid: { display: false },
-                    ticks: { font: { family: 'Plus Jakarta Sans', size: 10, weight: '500' } }
                 },
-                y: {
-                    beginAtZero: true,
-                    ticks: {
-                        font: { family: 'Plus Jakarta Sans', size: 10 },
-                        callback: function(value) {
-                            if (value >= 1e6) return '$' + (value / 1e6) + 'M';
-                            return formatCOP(value);
+                scales: {
+                    x: {
+                        grid: { display: false },
+                        ticks: { font: { family: 'Plus Jakarta Sans', size: 10, weight: '500' } }
+                    },
+                    y: {
+                        beginAtZero: true,
+                        ticks: {
+                            font: { family: 'Plus Jakarta Sans', size: 10 },
+                            callback: function(value) {
+                                if (value >= 1e6) return '$' + (value / 1e6) + 'M';
+                                return formatCOP(value);
+                            }
                         }
                     }
                 }
             }
+        });
+    }
+
+    const desgloseInsumos = {};
+    let noDataText = "Sin gastos de desarrollo registrados";
+
+    if (currentDoughnutType === "consolidado") {
+        noDataText = "Sin datos consolidados para el filtro seleccionado";
+        const fIni = (rawData.gastosIniciales || []).filter(item => isLoteMatch(String(item.Lote || item.lote).trim(), selectedLote) && isCicloMatch(item) && isDateInRange(item.Fecha || item.fecha) && isCultivoMatch(item));
+        const fDes = (rawData.gastosDesarrollo || []).filter(item => isLoteMatch(String(item.Lote || item.lote).trim(), selectedLote) && isCicloMatch(item) && isDateInRange(item.Fecha || item.fecha) && isCultivoMatch(item));
+        const fVen = (rawData.ventas || []).filter(item => isLoteMatch(String(item.Lote || item.lote).trim(), selectedLote) && isCicloMatch(item) && isDateInRange(item.Fecha || item.fecha) && isCultivoMatch(item));
+
+        const totIni = fIni.reduce((sum, item) => sum + (Number(item.Costo_Total_COP || item.costo_total_cop) || 0), 0);
+        const totDes = fDes.reduce((sum, item) => sum + (Number(item.Costo_Total_COP || item.costo_total_cop) || 0), 0);
+        const totVen = fVen.reduce((sum, item) => sum + (Number(item.Ingreso_Total_COP || item.ingreso_total_cop) || 0), 0);
+
+        if (totIni > 0) desgloseInsumos["Gastos Iniciales"] = totIni;
+        if (totDes > 0) desgloseInsumos["Gastos de Desarrollo"] = totDes;
+        if (totVen > 0) desgloseInsumos["Total Ventas"] = totVen;
+    } else if (currentDoughnutType === "gastos_desarrollo") {
+        noDataText = "Sin gastos de desarrollo registrados";
+        const filtrados = (rawData.gastosDesarrollo || []).filter(item => {
+            const itemLote = String(item.Lote || item.lote).trim();
+            return isLoteMatch(itemLote, selectedLote) && isCicloMatch(item) && isDateInRange(item.Fecha || item.fecha) && isCultivoMatch(item);
+        });
+        filtrados.forEach(item => {
+            const tipo = String(item.Tipo_Insumo || item.tipo_insumo || "Otros").trim();
+            const costo = Number(item.Costo_Total_COP || item.costo_total_cop) || 0;
+            desgloseInsumos[tipo] = (desgloseInsumos[tipo] || 0) + costo;
+        });
+    } else if (currentDoughnutType === "gastos_iniciales") {
+        noDataText = "Sin gastos iniciales registrados";
+        const filtrados = (rawData.gastosIniciales || []).filter(item => {
+            const itemLote = String(item.Lote || item.lote).trim();
+            return isLoteMatch(itemLote, selectedLote) && isCicloMatch(item) && isDateInRange(item.Fecha || item.fecha) && isCultivoMatch(item);
+        });
+        filtrados.forEach(item => {
+            const tipo = String(item.Cultivo_Semilla || item.cultivo_semilla || "Por Definir").trim();
+            const costo = Number(item.Costo_Total_COP || item.costo_total_cop) || 0;
+            desgloseInsumos[tipo] = (desgloseInsumos[tipo] || 0) + costo;
+        });
+    } else if (currentDoughnutType === "ventas") {
+        noDataText = "Sin ventas registradas";
+        const filtrados = (rawData.ventas || []).filter(item => {
+            const itemLote = String(item.Lote || item.lote).trim();
+            return isLoteMatch(itemLote, selectedLote) && isCicloMatch(item) && isDateInRange(item.Fecha || item.fecha) && isCultivoMatch(item);
+        });
+        filtrados.forEach(item => {
+            const tipo = String(item.Producto_Vendido || item.producto_vendido || "Otros").trim();
+            const ingreso = Number(item.Ingreso_Total_COP || item.ingreso_total_cop) || 0;
+            desgloseInsumos[tipo] = (desgloseInsumos[tipo] || 0) + ingreso;
+        });
+    }
+
+    const labelsDona = Object.keys(desgloseInsumos);
+    const dataDona = Object.values(desgloseInsumos);
+    const colorsDona = ['#10b981', '#3b82f6', '#f59e0b', '#ec4899', '#8b5cf6', '#6b7280', '#06b6d4', '#f97316'];
+
+    const donaContext = ctxDona.getContext('2d');
+    if (donaContext) {
+        if (dataDona.length === 0) {
+            donaContext.clearRect(0, 0, 300, 300);
+            donaContext.font = "14px 'Plus Jakarta Sans'";
+            donaContext.fillStyle = "#94a3b8";
+            donaContext.textAlign = "center";
+            donaContext.fillText(noDataText, 150, 150);
+        } else {
+            doughnutChartInstance = new Chart(donaContext, {
+                type: 'doughnut',
+                data: {
+                    labels: labelsDona,
+                    datasets: [{
+                        data: dataDona,
+                        backgroundColor: colorsDona.slice(0, labelsDona.length),
+                        borderWidth: 2,
+                        borderColor: '#ffffff'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'right',
+                            labels: {
+                                font: { family: 'Plus Jakarta Sans', size: 10, weight: '500' },
+                                boxWidth: 10
+                            }
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                    const value = context.raw;
+                                    const percentage = Math.round((value / total) * 100);
+                                    return `${context.label}: ${formatCOP(value)} (${percentage}%)`;
+                                }
+                            }
+                        }
+                    },
+                    cutout: '65%'
+                }
+            });
         }
-    });
+    }
+}
 
     const desgloseInsumos = {};
     let noDataText = "Sin gastos de desarrollo registrados";
